@@ -26,7 +26,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
     hass.data[DOMAIN][entry.entry_id] = DweloData(
-        entry_id=entry.entry_id, client=client, devices=await client.get_devices()
+        entry_id=entry.entry_id,
+        client=client,
+        device_metadata=await client.get_devices(),
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

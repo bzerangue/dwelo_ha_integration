@@ -33,6 +33,8 @@ class DweloClient:
         self._password = password
         self._session: ClientSession = async_create_clientsession(hass)
 
+        # Dwelo seems to operate on gateways. Exactly what that is, I'm not sure,
+        # but every device has a parent gateway. These are currently tracked but unused
         self._registered_gateways = set()
         self._bearer_token = None
 
@@ -68,32 +70,40 @@ class DweloClient:
             date_registered=entry["dateRegistered"],
         )
 
+    def _transform_endpoint(self, endpoint: str) -> str:
+        """Transform an endpoint to the correct format."""
+        return f"{self._host}{endpoint}"
+
     def _get_headers(self):
+        """Get headers required for making an authorized call to Dwelo."""
         if not self._bearer_token:
             raise MissingBearerToken
         return {"authorization": self._bearer_token}
 
-    def _transform_endpoint(self, endpoint: str) -> str:
-        return f"{self._host}{endpoint}"
-
     async def _handle_dwelo_response(self, response: ClientResponse):
+        """Handle a Dwelo API response and get the json body."""
         if not response.ok:
             _LOGGER.error(f"Dwelo API returned an error: {response}")  # noqa: G004
             return None
 
-        _LOGGER.info(f"Dwelo successful response: {response.status}")  # noqa: G004
+        _LOGGER.debug(f"Dwelo successful response: {response.status}")  # noqa: G004
 
         return await response.json()
 
-    async def _get(self, endpoint: str) -> any:
+    async def get(self, endpoint: str) -> any:
+        """Make a GET request to the Dwelo API."""
+        _LOGGER.debug(f"Making request to Dwelo API endpoint {endpoint}")  # noqa: G004
         response = await self._session.get(
             self._transform_endpoint(endpoint), headers=self._get_headers()
         )
 
         return await self._handle_dwelo_response(response)
 
-    async def _post(self, endpoint: str, json_payload: object) -> any:
-        _LOGGER.info(f"Dwelo API request: {json_payload}")  # noqa: G004
+    async def post(self, endpoint: str, json_payload: object) -> any:
+        """Make a POST request to the Dwelo API."""
+        _LOGGER.debug(
+            f"Making request to Dwelo API endpoint {endpoint} with payload: {json_payload}"  # noqa: G004
+        )
         response = await self._session.post(
             self._transform_endpoint(endpoint),
             headers=self._get_headers(),
@@ -103,7 +113,8 @@ class DweloClient:
         return await self._handle_dwelo_response(response)
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
-        device_details = await self._get(self.DEVICE_ENDPOINT)
+        """Get all devices from the Dwelo API."""
+        device_details = await self.get(self.DEVICE_ENDPOINT)
         if not device_details:
             return {}
 
@@ -115,53 +126,6 @@ class DweloClient:
                 self._registered_gateways.add(mapped_device.gateway_id)
 
         return grouped_devices
-
-    async def get_thermostat_device_data(
-        self, device_metadata: DweloDeviceMetadata
-    ) -> DweloThermostatData:
-        if device_metadata.device_type != "thermostat":
-            _LOGGER.error(f"Device is not a thermostat: {device_metadata}")  # noqa: G004
-            return None
-
-        gateway_data = await self._get(
-            f"{self.GATEWAY_ENDPOINT}{device_metadata.gateway_id}"
-        )
-        if not gateway_data:
-            return None
-
-        device_data = {}
-        for sensor in gateway_data["results"]:
-            if sensor["deviceId"] == device_metadata.uid:
-                device_data[sensor["sensorType"]] = sensor
-
-        return convert_to_thermostat(device_data)
-
-    async def set_thermostat_temperature(
-        self,
-        device_metadata: DweloDeviceMetadata,
-        temperature: float,
-        mode: DweloThermostatMode,
-    ) -> bool:
-        if device_metadata.device_type != "thermostat":
-            _LOGGER.error(f"Device is not a thermostat: {device_metadata}")  # noqa: G004
-            return False
-
-        await self._post(
-            f"{self.DEVICE_ENDPOINT}{device_metadata.uid}/command/",
-            {"command": mode, "commandValue": temperature},
-        )
-
-    async def set_thermostat_mode(
-        self, device_metadata: DweloDeviceMetadata, mode: DweloThermostatMode
-    ) -> bool:
-        if device_metadata.device_type != "thermostat":
-            _LOGGER.error(f"Device is not a thermostat: {device_metadata}")  # noqa: G004
-            return False
-
-        await self._post(
-            f"{self.DEVICE_ENDPOINT}{device_metadata.uid}/command/",
-            {"command": mode},
-        )
 
 
 class MissingBearerToken(Exception):

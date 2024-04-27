@@ -45,7 +45,7 @@ class DweloData:
 
     entry_id: str
     client: any
-    devices: dict[str, DweloDeviceMetadata]
+    device_metadata: dict[str, DweloDeviceMetadata]
 
 
 @dataclass

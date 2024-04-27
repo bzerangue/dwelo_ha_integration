@@ -16,13 +16,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .dwelo_client import DweloClient
-from .models import (
-    DweloData,
-    DweloDeviceMetadata,
-    DweloThermostatData,
-    DweloThermostatMode,
-)
+from .dwelo_devices.dwelo_thermostat import DweloThermostatDevice
+from .models import DweloData, DweloThermostatMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,72 +43,62 @@ async def async_setup_entry(
     """Set up the Dwelo climate platform."""
 
     data: DweloData = hass.data[DOMAIN][entry.entry_id]
-    devices = []
+    entities = []
 
-    for metadata in data.devices.values():
+    for metadata in data.device_metadata.values():
         if metadata.device_type == "thermostat":
-            device_data = await data.client.get_thermostat_device_data(metadata)
-            devices.append(DweloThermostat(data, metadata, data.client, device_data))
+            device = await DweloThermostatDevice.from_metadata(data.client, metadata)
+            entities.append(DweloThermostatEntity(device))
 
-    async_add_entities(devices)
+    async_add_entities(entities)
 
 
-class DweloThermostat(ClimateEntity):
-    """Representation of a Dwelo thermostat device."""
+class DweloThermostatEntity(ClimateEntity):
+    """Representation of a Dwelo thermostat entity within Home Assistant."""
 
     def __init__(
         self,
-        data: DweloData,
-        device_metadata: DweloDeviceMetadata,
-        dwelo_client: DweloClient,
-        device_data: DweloThermostatData,
+        device: DweloThermostatDevice,
     ) -> None:
         """Initialize the thermostat."""
         super().__init__()
-        self._data = data
-        self._device_metadata = device_metadata
-        self._client = dwelo_client
+        self._device = device
 
-        self._device_data = device_data
-
-        self._attr_unique_id = f"thermostat_{device_metadata.uid}"
-        self._attr_name = device_metadata.given_name
+        self._attr_unique_id = f"thermostat_{self._device.metadata.uid}"
+        self._attr_name = self._device.metadata.given_name
         self._attr_temperature_unit = UnitOfTemperature.FAHRENHEIT
         self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.COOL]
-        self._attr_hvac_mode = DWELO_MODE_TO_HA_MODE[device_data.mode]
         self._attr_supported_features = self._get_supported_features()
 
     async def async_update(self) -> None:
         """Update the thermostat data from the Dwelo API."""
-        self._device_data = await self._client.get_thermostat_device_data(
-            self._device_metadata
-        )
-        _LOGGER.info(f"Updated thermostat data {self._device_data}")  # noqa: G004
+        await self._device.async_update()
+        _LOGGER.debug(f"Updated thermostat data {self._device.data}")  # noqa: G004
 
     @property
     def current_temperature(self) -> float:
         """Return the current temperature."""
-        return self._device_data.current_temperature
+        return self._device.data.current_temperature
 
     @property
     def target_temperature(self) -> float:
         """Return the target temperature based on HVAC mode."""
-        if DWELO_MODE_TO_HA_MODE[self._device_data.mode] == HVACMode.HEAT:
-            return self._device_data.target_temperature_heat
-        if DWELO_MODE_TO_HA_MODE[self._device_data.mode] == HVACMode.COOL:
-            return self._device_data.target_temperature_cool
+        if DWELO_MODE_TO_HA_MODE[self._device.data.mode] == HVACMode.HEAT:
+            return self._device.data.target_temperature_heat
+        if DWELO_MODE_TO_HA_MODE[self._device.data.mode] == HVACMode.COOL:
+            return self._device.data.target_temperature_cool
 
         return None
 
     @property
     def hvac_mode(self) -> HVACMode:
         """Return the current HVAC mode."""
-        return DWELO_MODE_TO_HA_MODE[self._device_data.mode]
+        return DWELO_MODE_TO_HA_MODE[self._device.data.mode]
 
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current HVAC action."""
-        return DWELO_STATE_TO_HA_ACTION[self._device_data.state]
+        return DWELO_STATE_TO_HA_ACTION[self._device.data.state]
 
     def _get_supported_features(self) -> ClimateEntityFeature:
         """Compute the bitmap of supported features from the current state."""
@@ -121,16 +106,16 @@ class DweloThermostat(ClimateEntity):
 
     async def _set_ac(
         self,
-        temperature: float = None,
+        temperature: float = None,  # noqa: RUF013
         mode: DweloThermostatMode = None,  # noqa: RUF013
     ) -> None:
         if mode is None:
-            mode = self._device_data.mode
+            mode = self._device.data.mode
         if temperature is None:
-            await self._client.set_thermostat_mode(self._device_metadata, mode)
+            await self._device.set_thermostat_mode(self._device.metadata, mode)
         else:
-            await self._client.set_thermostat_temperature(
-                self._device_metadata, temperature, mode
+            await self._device.set_thermostat_temperature(
+                self._device.metadata, temperature, mode
             )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:

@@ -1,6 +1,7 @@
 {
   "domain": "dwelo",
   "name": "Dwelo Integration",
+  "version": "0.0.1",
   "codeowners": [
     "@rtp4jc"
   ],

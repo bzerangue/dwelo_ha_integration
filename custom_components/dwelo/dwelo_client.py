@@ -110,7 +110,10 @@ class DweloClient:
         """Handle a Dwelo API response and get the json body."""
         if not response.ok:
             response_text = await response.text()
-            _LOGGER.error("Dwelo API returned an error: %s, %s", response.status, response_text)
+            if response.status == 401:
+                _LOGGER.error("Authentication failed: %s, %s", response.status, response_text)
+            else:
+                _LOGGER.error("Dwelo API returned an error: %s, %s", response.status, response_text)
             return None
 
         _LOGGER.debug("Dwelo successful response: %s", response.status)

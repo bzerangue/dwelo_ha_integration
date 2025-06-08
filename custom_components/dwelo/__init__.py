@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PASSWORD, CONF_EMAIL, Platform
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, HOST
@@ -25,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = DweloClient(
         HOST,
         hass,
-        entry.data[CONF_EMAIL],
+        entry.data[CONF_USERNAME],
         entry.data[CONF_PASSWORD],
     )
 

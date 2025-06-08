@@ -112,6 +112,8 @@ class DweloClient:
             response_text = await response.text()
             if response.status == 401:
                 _LOGGER.error("Authentication failed: status=%s, details=%s", response.status, response_text)
+            elif response.status == 403:
+                _LOGGER.error("Forbidden access: status=%s, details=%s", response.status, response_text)
             else:
                 _LOGGER.error("Dwelo API returned an error: status=%s, details=%s", response.status, response_text)
             return None
@@ -154,8 +156,13 @@ class DweloClient:
             f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
         )
         if not device_details:
-            _LOGGER.error("Failed to fetch devices for gateway %s: No response", self._gateway_id)
-            return {}
+            _LOGGER.warning("No response from device API for gateway %s, attempting fallback", self._gateway_id)
+            # Fallback to original behavior without gatewayId
+            device_details = await self.get(f"{self.DEVICE_ENDPOINT}?limit=5000&offset=0")
+            if not device_details or "results" not in device_details:
+                _LOGGER.error("Failed to fetch devices without gateway_id: %s", device_details)
+                return {}
+
         if "results" not in device_details:
             _LOGGER.error("Failed to fetch devices for gateway %s: No 'results' key in response: %s", self._gateway_id, device_details)
             return {}

@@ -151,21 +151,16 @@ class DweloClient:
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
         """Get all devices from the Dwelo API."""
-        _LOGGER.debug("Fetching devices with gateway_id: %s", self._gateway_id)
-        device_details = await self.get(
-            f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
-        )
-        if not device_details:
-            _LOGGER.warning("No response from device API for gateway %s, attempting fallback", self._gateway_id)
-            # Fallback to original behavior without gatewayId
-            device_details = await self.get(f"{self.DEVICE_ENDPOINT}?limit=5000&offset=0")
+        _LOGGER.debug("Fetching devices, initial attempt without gatewayId")
+        device_details = await self.get(f"{self.DEVICE_ENDPOINT}?limit=5000&offset=0")
+        if not device_details or "results" not in device_details:
+            _LOGGER.warning("No devices found without gatewayId: %s, trying with configured gateway_id: %s", device_details, self._gateway_id)
+            device_details = await self.get(
+                f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
+            )
             if not device_details or "results" not in device_details:
-                _LOGGER.error("Failed to fetch devices without gateway_id: %s", device_details)
+                _LOGGER.error("Failed to fetch devices with gateway_id %s: %s", self._gateway_id, device_details)
                 return {}
-
-        if "results" not in device_details:
-            _LOGGER.error("Failed to fetch devices for gateway %s: No 'results' key in response: %s", self._gateway_id, device_details)
-            return {}
 
         _LOGGER.debug("Device list response: %s", device_details)
         grouped_devices = {}
@@ -179,7 +174,7 @@ class DweloClient:
                 _LOGGER.error("Skipping device %s: %s", dev.get("uid", "unknown"), e)
 
         if not grouped_devices:
-            _LOGGER.error("No devices retrieved for gateway %s", self._gateway_id)
+            _LOGGER.error("No devices retrieved")
         else:
             _LOGGER.debug("Retrieved devices: %s", grouped_devices)
         return grouped_devices

@@ -47,6 +47,7 @@ class DweloClient:
 
     async def login(self) -> bool:
         """Login to the Dwelo API."""
+        _LOGGER.debug("Attempting login with email: %s", self._email)
         response = await self._session.post(
             self._transform_endpoint(self.LOGIN_ENDPOINT),
             json={
@@ -145,15 +146,16 @@ class DweloClient:
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
         """Get all devices from the Dwelo API."""
-        grouped_devices = {}
+        _LOGGER.debug("Fetching devices with gateway_id: %s", self._gateway_id)
         device_details = await self.get(
             f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
         )
         if not device_details or "results" not in device_details:
             _LOGGER.error("Failed to fetch devices for gateway %s: %s", self._gateway_id, device_details)
-            return grouped_devices
+            return {}
 
         _LOGGER.debug("Device list response: %s", device_details)
+        grouped_devices = {}
         for dev in device_details["results"]:
             try:
                 mapped_device = self._response_entry_to_device(dev)

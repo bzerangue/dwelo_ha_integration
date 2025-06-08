@@ -59,10 +59,10 @@ class DweloClient:
 
         if not response.ok:
             response_text = await response.text()
-            _LOGGER.error("Dwelo auth returned an error: %s, %s", response.status, response_text)
+            _LOGGER.error("Dwelo auth returned an error: status=%s, details=%s", response.status, response_text)
             return False
 
-        _LOGGER.info("Dwelo auth success: %s", response.status)
+        _LOGGER.info("Dwelo auth success: status=%s", response.status)
         response_json = await response.json()
         self._bearer_token = response_json["token"]
         _LOGGER.debug("Bearer token obtained: %s...%s", self._bearer_token[:10], self._bearer_token[-10:])
@@ -82,7 +82,7 @@ class DweloClient:
                 is_online=entry["isOnline"],
                 date_registered=entry["dateRegistered"],
             )
-            _LOGGER.debug("Parsed device metadata: %s", metadata)
+            _LOGGER.debug("Parsed device metadata: uid=%s, type=%s", metadata.uid, metadata.device_type)
             return metadata
         except KeyError as e:
             _LOGGER.error("Missing field in device entry %s: %s", entry.get("uid", "unknown"), e)
@@ -111,12 +111,12 @@ class DweloClient:
         if not response.ok:
             response_text = await response.text()
             if response.status == 401:
-                _LOGGER.error("Authentication failed: %s, %s", response.status, response_text)
+                _LOGGER.error("Authentication failed: status=%s, details=%s", response.status, response_text)
             else:
-                _LOGGER.error("Dwelo API returned an error: %s, %s", response.status, response_text)
+                _LOGGER.error("Dwelo API returned an error: status=%s, details=%s", response.status, response_text)
             return None
 
-        _LOGGER.debug("Dwelo successful response: %s", response.status)
+        _LOGGER.debug("Dwelo successful response: status=%s", response.status)
         try:
             json_response = await response.json()
             _LOGGER.debug("API response: %s", json_response)
@@ -128,7 +128,7 @@ class DweloClient:
     async def get(self, endpoint: str) -> any:
         """Make a GET request to the Dwelo API."""
         full_endpoint = self._transform_endpoint(endpoint)
-        _LOGGER.debug("Making GET request to Dwelo API endpoint %s", full_endpoint)
+        _LOGGER.debug("Making GET request to Dwelo API endpoint: %s", full_endpoint)
         response = await self._session.get(
             full_endpoint, headers=self._get_headers()
         )
@@ -137,14 +137,14 @@ class DweloClient:
     async def post(self, endpoint: str, json_payload: object) -> any:
         """Make a POST request to the Dwelo API."""
         full_endpoint = self._transform_endpoint(endpoint)
-        _LOGGER.debug("Making POST request to Dwelo API endpoint %s with payload: %s", full_endpoint, json_payload)
+        _LOGGER.debug("Making POST request to Dwelo API endpoint: %s with payload: %s", full_endpoint, json_payload)
         response = await self._session.post(
             full_endpoint,
             headers=self._get_headers(),
             json=json_payload,
         )
         response_text = await response.text()
-        _LOGGER.debug("POST response: %s, %s", response.status, response_text)
+        _LOGGER.debug("POST response: status=%s, details=%s", response.status, response_text)
         return await self._handle_dwelo_response(response)
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
@@ -153,8 +153,11 @@ class DweloClient:
         device_details = await self.get(
             f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
         )
-        if not device_details or "results" not in device_details:
-            _LOGGER.error("Failed to fetch devices for gateway %s: %s", self._gateway_id, device_details)
+        if not device_details:
+            _LOGGER.error("Failed to fetch devices for gateway %s: No response", self._gateway_id)
+            return {}
+        if "results" not in device_details:
+            _LOGGER.error("Failed to fetch devices for gateway %s: No 'results' key in response: %s", self._gateway_id, device_details)
             return {}
 
         _LOGGER.debug("Device list response: %s", device_details)

@@ -149,27 +149,17 @@ class DweloClient:
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
         """Get all devices from the Dwelo API."""
-        _LOGGER.debug("Fetching devices without gatewayId")
-        device_details = await self.get(f"{self.DEVICE_ENDPOINT}?limit=5000&offset=0")
-        if not device_details or "results" not in device_details:
-            _LOGGER.error("Failed to fetch devices: %s", device_details)
+        device_details = await self.get(self.DEVICE_ENDPOINT)
+        if not device_details:
             return {}
 
-        _LOGGER.debug("Device list response: %s", device_details)
         grouped_devices = {}
         for dev in device_details["results"]:
-            try:
-                mapped_device = self._response_entry_to_device(dev)
-                grouped_devices[mapped_device.uid] = mapped_device
-                if mapped_device.gateway_id not in self._registered_gateways:
-                    self._registered_gateways.add(mapped_device.gateway_id)
-            except Exception as e:
-                _LOGGER.error("Skipping device %s: %s", dev.get("uid", "unknown"), e)
+            mapped_device = self._response_entry_to_device(dev)
+            grouped_devices[dev["uid"]] = mapped_device
+            if mapped_device.gateway_id not in self._registered_gateways:
+                self._registered_gateways.add(mapped_device.gateway_id)
 
-        if not grouped_devices:
-            _LOGGER.error("No devices retrieved")
-        else:
-            _LOGGER.debug("Retrieved devices: %s", grouped_devices)
         return grouped_devices
 
 

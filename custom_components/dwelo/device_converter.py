@@ -16,19 +16,8 @@ def convert_to_thermostat(dwelo_device_data: any):
 
 def convert_to_lock(dwelo_device_data: any, metadata: any) -> DweloLockData:
     """Convert a Dwelo device data to a DweloLockData object."""
-    lock_state = dwelo_device_data.get("lock", {}).get("value", "unknown")
-    # Map API state to DweloLockState enum, defaulting to UNLOCKED if unknown
-    state_map = {
-        "locked": DweloLockState.LOCKED,
-        "unlocked": DweloLockState.UNLOCKED,
-    }
-    state = state_map.get(lock_state.lower(), DweloLockState.UNLOCKED)
-
-    battery_level = int(dwelo_device_data.get("battery", {}).get("value", 0))
-    is_online = metadata.is_online if metadata else False
-
     return DweloLockData(
-        state=state,
-        battery_level=battery_level,
-        is_online=is_online,
+        state=DweloLockState(dwelo_device_data["lock"]["value"]),
+        battery_level=int(dwelo_device_data["battery"]["value"]),
+        is_online=metadata.is_online
     )

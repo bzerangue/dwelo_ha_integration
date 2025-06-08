@@ -1,5 +1,6 @@
 """The Dwelo Integration integration."""
 
+import logging
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -9,6 +10,8 @@ from homeassistant.core import HomeAssistant
 from .const import CONF_GATEWAY_ID, DOMAIN, HOST
 from .dwelo_client import DweloClient
 from .models import DweloData
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.LOCK]
 

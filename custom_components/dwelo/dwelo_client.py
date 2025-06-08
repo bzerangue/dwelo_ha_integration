@@ -5,7 +5,7 @@ from aiohttp import ClientResponse, ClientSession
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-from .device_converter import convert_to_thermostat
+from .device_converter import convert_to_thermostat, convert_to_lock
 from .models import (
     DweloDeviceMetadata,
     DweloThermostatData,
@@ -33,15 +33,17 @@ class DweloClient:
         hass: HomeAssistant,
         email: str,
         password: str,
+        gateway_id: str,
     ) -> None:
         """Create a Dwelo client."""
         self._host = host if host.endswith("/") else host + "/"
         self._email = email
         self._password = password
+        self._gateway_id = gateway_id
         self._session: ClientSession = async_create_clientsession(hass)
         self._registered_gateways = set()
         self._bearer_token = None
-        _LOGGER.debug("DweloClient initialized, models imported successfully")
+        _LOGGER.debug("DweloClient initialized with gateway_id: %s", gateway_id)
 
     async def login(self) -> bool:
         """Login to the Dwelo API."""
@@ -56,12 +58,13 @@ class DweloClient:
 
         if not response.ok:
             response_text = await response.text()
-            _LOGGER.error(f"Dwelo auth returned an error: {response.status}, {response_text}")
+            _LOGGER.error("Dwelo auth returned an error: %s, %s", response.status, response_text)
             return False
 
-        _LOGGER.info(f"Dwelo auth success: {response.status}")
+        _LOGGER.info("Dwelo auth success: %s", response.status)
         response_json = await response.json()
         self._bearer_token = response_json["token"]
+        _LOGGER.debug("Bearer token obtained: %s...%s", self._bearer_token[:10], self._bearer_token[-10:])
         return True
 
     def _response_entry_to_device(self, entry) -> DweloDeviceMetadata:
@@ -78,16 +81,16 @@ class DweloClient:
                 is_online=entry["isOnline"],
                 date_registered=entry["dateRegistered"],
             )
-            _LOGGER.debug(f"Parsed device metadata: {metadata}")
+            _LOGGER.debug("Parsed device metadata: %s", metadata)
             return metadata
         except KeyError as e:
-            _LOGGER.error(f"Missing field in device entry {entry.get('uid', 'unknown')}: {e}")
+            _LOGGER.error("Missing field in device entry %s: %s", entry.get("uid", "unknown"), e)
             raise
         except ValueError as e:
-            _LOGGER.error(f"Invalid device type for {entry.get('uid', 'unknown')}: {e}")
+            _LOGGER.error("Invalid device type for %s: %s", entry.get("uid", "unknown"), e)
             raise
         except Exception as e:
-            _LOGGER.error(f"Failed to parse device {entry.get('uid', 'unknown')}: {e}")
+            _LOGGER.error("Failed to parse device %s: %s", entry.get("uid", "unknown"), e)
             raise
 
     def _transform_endpoint(self, endpoint: str) -> str:
@@ -98,28 +101,30 @@ class DweloClient:
         """Get headers required for making an authorized call to Dwelo."""
         if not self._bearer_token:
             raise MissingBearerToken
-        return {"Authorization": f"Bearer {self._bearer_token}"}
+        headers = {"authorization": self._bearer_token}
+        _LOGGER.debug("Request headers: %s", headers)
+        return headers
 
     async def _handle_dwelo_response(self, response: ClientResponse):
         """Handle a Dwelo API response and get the json body."""
         if not response.ok:
             response_text = await response.text()
-            _LOGGER.error(f"Dwelo API returned an error: {response.status}, {response_text}")
+            _LOGGER.error("Dwelo API returned an error: %s, %s", response.status, response_text)
             return None
 
-        _LOGGER.debug(f"Dwelo successful response: {response.status}")
+        _LOGGER.debug("Dwelo successful response: %s", response.status)
         try:
             json_response = await response.json()
-            _LOGGER.debug(f"API response: {json_response}")
+            _LOGGER.debug("API response: %s", json_response)
             return json_response
         except Exception as e:
-            _LOGGER.error(f"Failed to parse JSON response: {e}")
+            _LOGGER.error("Failed to parse JSON response: %s", e)
             return None
 
     async def get(self, endpoint: str) -> any:
         """Make a GET request to the Dwelo API."""
         full_endpoint = self._transform_endpoint(endpoint)
-        _LOGGER.debug(f"Making GET request to Dwelo API endpoint {full_endpoint}")
+        _LOGGER.debug("Making GET request to Dwelo API endpoint %s", full_endpoint)
         response = await self._session.get(
             full_endpoint, headers=self._get_headers()
         )
@@ -128,25 +133,27 @@ class DweloClient:
     async def post(self, endpoint: str, json_payload: object) -> any:
         """Make a POST request to the Dwelo API."""
         full_endpoint = self._transform_endpoint(endpoint)
-        _LOGGER.debug(f"Making POST request to Dwelo API endpoint {full_endpoint} with payload: {json_payload}")
+        _LOGGER.debug("Making POST request to Dwelo API endpoint %s with payload: %s", full_endpoint, json_payload)
         response = await self._session.post(
             full_endpoint,
             headers=self._get_headers(),
             json=json_payload,
         )
         response_text = await response.text()
-        _LOGGER.debug(f"POST response: {response.status}, {response_text}")
+        _LOGGER.debug("POST response: %s, %s", response.status, response_text)
         return await self._handle_dwelo_response(response)
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
         """Get all devices from the Dwelo API."""
-        device_details = await self.get(self.DEVICE_ENDPOINT)
-        if not device_details or "results" not in device_details:
-            _LOGGER.error(f"Failed to fetch devices: {device_details}")
-            return {}
-
-        _LOGGER.debug(f"Device list response: {device_details}")
         grouped_devices = {}
+        device_details = await self.get(
+            f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
+        )
+        if not device_details or "results" not in device_details:
+            _LOGGER.error("Failed to fetch devices for gateway %s: %s", self._gateway_id, device_details)
+            return grouped_devices
+
+        _LOGGER.debug("Device list response: %s", device_details)
         for dev in device_details["results"]:
             try:
                 mapped_device = self._response_entry_to_device(dev)
@@ -154,12 +161,12 @@ class DweloClient:
                 if mapped_device.gateway_id not in self._registered_gateways:
                     self._registered_gateways.add(mapped_device.gateway_id)
             except Exception as e:
-                _LOGGER.error(f"Skipping device {dev.get('uid', 'unknown')}: {e}")
+                _LOGGER.error("Skipping device %s: %s", dev.get("uid", "unknown"), e)
 
         if not grouped_devices:
-            _LOGGER.error("No devices retrieved from API")
+            _LOGGER.error("No devices retrieved for gateway %s", self._gateway_id)
         else:
-            _LOGGER.debug(f"Retrieved devices: {grouped_devices}")
+            _LOGGER.debug("Retrieved devices: %s", grouped_devices)
         return grouped_devices
 
 

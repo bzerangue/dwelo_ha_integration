@@ -75,7 +75,6 @@ class DweloClient:
                 uid=str(entry["uid"]),
                 device_type=device_type,
                 given_name=entry["givenName"],
-                gateway_id=entry["gatewayId"],
                 is_active=entry["isActive"],
                 is_online=entry["isOnline"],
                 date_registered=entry["dateRegistered"],

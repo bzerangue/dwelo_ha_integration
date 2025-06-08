@@ -40,7 +40,7 @@ class DweloDeviceMetadata:
     uid: str
     device_type: DweloDeviceType
     given_name: str
-    gateway_id: str
+    gateway_id: int
     is_active: bool
     is_online: bool
     date_registered: str

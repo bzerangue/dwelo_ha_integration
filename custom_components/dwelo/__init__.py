@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 """The Dwelo Integration integration."""
 
 import logging
-from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform

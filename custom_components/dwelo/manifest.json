@@ -1,17 +1,12 @@
 {
   "domain": "dwelo",
-  "name": "Dwelo Integration",
-  "version": "0.0.1",
-  "codeowners": [
-    "@rtp4jc"
-  ],
-  "config_flow": true,
-  "single_config_entry": true,
-  "dependencies": [],
-  "documentation": "https://www.home-assistant.io/integrations/dwelo",
-  "homekit": {},
-  "iot_class": "cloud_polling",
+  "name": "Dwelo Integration for Home Assistant",
+  "version": "1.0.0",
+  "documentation": "https://github.com/bzerangue/dwelo_ha_integration",
+  "issue_tracker": "https://github.com/bzerangue/dwelo_ha_integration/issues",
+  "codeowners": ["@bzerangue"],
   "requirements": [],
-  "ssdp": [],
-  "zeroconf": []
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "supported_platforms": ["climate", "lock"]
 }

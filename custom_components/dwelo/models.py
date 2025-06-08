@@ -8,6 +8,7 @@ class DweloDeviceType(Enum):
     """Dwelo device types."""
 
     THERMOSTAT = "thermostat"
+    LOCK = "lock"
 
 
 class DweloThermostatMode(Enum):
@@ -24,6 +25,12 @@ class DweloThermostatState(Enum):
     HEAT = "heat"
     COOL = "cool"
     IDLE = "idle"
+
+class DweloLockState(Enum):
+    """Dwelo lock states."""
+
+    LOCKED = "locked"
+    UNLOCKED = "unlocked"
 
 
 @dataclass
@@ -57,3 +64,12 @@ class DweloThermostatData:
     target_temperature_cool: float
     target_temperature_heat: float
     state: str
+
+
+@dataclass
+class DweloLockData:
+    """Dwelo lock data."""
+
+    state: DweloLockState
+    battery_level: int
+    is_online: bool

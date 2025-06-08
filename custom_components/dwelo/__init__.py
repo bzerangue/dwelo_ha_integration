@@ -10,7 +10,7 @@ from .const import DOMAIN, HOST
 from .dwelo_client import DweloClient
 from .models import DweloData
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE]
+PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.LOCK]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -1,5 +1,5 @@
 {
-    "name": "Dwelo Custom Integration",
-    "domains": ["climate"],
-    "render_readme": true
-  }
+  "name": "Dwelo Custom Integration",
+  "domains": ["climate", "lock"],
+  "render_readme": true
+}

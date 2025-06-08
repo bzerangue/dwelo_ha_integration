@@ -1,118 +1,103 @@
-"""Config flow for Dwelo Integration."""
+"""Config flow for Dwelo Integration integration."""
+
+from __future__ import annotations
 
 import logging
+from typing import Any
+
 import voluptuous as vol
 
-from homeassistant import config_entries
-from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.core import callback, HomeAssistant
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN, HOST
 from .dwelo_client import DweloClient
 
 _LOGGER = logging.getLogger(__name__)
 
-class DweloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+# TODO adjust the data schema to the data that you need
+STEP_USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_USERNAME): str,
+        vol.Required(CONF_PASSWORD): str,
+    }
+)
+
+
+class PlaceholderHub:
+    """Placeholder class to make tests pass.
+
+    TODO Remove this placeholder class and replace with things from your PyPI package.
+    """
+
+    def __init__(self, host: str) -> None:
+        """Initialize."""
+        self.host = host
+
+    async def authenticate(self, bearer_token: str) -> bool:
+        """Test if we can authenticate with the host."""
+        return True
+
+
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
+    """Validate the user input allows us to connect.
+
+    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
+    """
+    # TODO validate the data can be used to set up a connection.
+
+    # If your PyPI package is not built with async, pass your methods
+    # to the executor:
+    # await hass.async_add_executor_job(
+    #     your_validate_func, data[CONF_USERNAME], data[CONF_PASSWORD]
+    # )
+    client = DweloClient(HOST, hass, data[CONF_USERNAME], data[CONF_PASSWORD])
+
+    if not await client.login():
+        raise InvalidAuth
+
+    # If you cannot connect:
+    # throw CannotConnect
+    # If the authentication is wrong:
+    # InvalidAuth
+
+    # Return info that you want to store in the config entry.
+    return True
+
+
+class ConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Dwelo Integration."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
-        errors = {}
-        _LOGGER.debug("Starting Dwelo config flow user step")
-
+        errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                _LOGGER.debug("Validating input: %s", user_input)
-                client = DweloClient(
-                    HOST,
-                    self.hass,
-                    user_input[CONF_EMAIL],
-                    user_input[CONF_PASSWORD],
-                )
-                if not await client.login():
-                    errors["base"] = "invalid_auth"
-                else:
-                    devices = await client.get_devices()
-                    if not devices:
-                        errors["base"] = "no_devices"
-                    else:
-                        await self.async_set_unique_id(user_input[CONF_EMAIL])
-                        self._abort_if_unique_id_configured()
-                        return self.async_create_entry(
-                            title=f"Dwelo ({user_input[CONF_EMAIL]})",
-                            data=user_input,
-                        )
-            except Exception as e:
-                _LOGGER.error("Error setting up Dwelo config: %s", e)
+                await validate_input(self.hass, user_input)
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
+            else:
+                return self.async_create_entry(title=DOMAIN, data=user_input)
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_EMAIL): str,
-                    vol.Required(CONF_PASSWORD): str,
-                }
-            ),
-            errors=errors,
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
         )
 
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return OptionsFlowHandler(config_entry)
+
+class CannotConnect(HomeAssistantError):
+    """Error to indicate we cannot connect."""
 
 
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for Dwelo Integration."""
-
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self._config_entry = config_entry
-        _LOGGER.debug("Initializing Dwelo options flow for entry: %s", config_entry.entry_id)
-
-    async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        errors = {}
-        _LOGGER.debug("Starting Dwelo options flow init step with config: %s", self._config_entry.data)
-
-        if user_input is not None:
-            try:
-                client = DweloClient(
-                    HOST,
-                    self.hass,
-                    user_input[CONF_EMAIL],
-                    user_input[CONF_PASSWORD],
-                )
-                if not await client.login():
-                    errors["base"] = "invalid_auth"
-                else:
-                    devices = await client.get_devices()
-                    if not devices:
-                        errors["base"] = "no_devices"
-                    else:
-                        return self.async_create_entry(title="", data=user_input)
-            except Exception as e:
-                _LOGGER.error("Error updating Dwelo options: %s", e)
-                errors["base"] = "unknown"
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_EMAIL,
-                        default=self._config_entry.data.get(CONF_EMAIL),
-                    ): str,
-                    vol.Required(
-                        CONF_PASSWORD,
-                        default=self._config_entry.data.get(CONF_PASSWORD),
-                    ): str,
-                }
-            ),
-            errors=errors,
-        )
+class InvalidAuth(HomeAssistantError):
+    """Error to indicate there is invalid auth."""

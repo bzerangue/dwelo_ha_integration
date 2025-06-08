@@ -9,7 +9,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
 
-from .const import CONF_GATEWAY_ID, DOMAIN
+from .const import CONF_GATEWAY_ID, DOMAIN, HOST
 from .dwelo_client import DweloClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ class DweloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # Validate input by testing login and device retrieval
                 client = DweloClient(
+                    HOST,
                     self.hass,
                     user_input[CONF_EMAIL],
                     user_input[CONF_PASSWORD],
@@ -49,7 +50,7 @@ class DweloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             data=user_input,
                         )
             except Exception as e:
-                _LOGGER.error(f"Error setting up Dwelo config: {e}")
+                _LOGGER.error("Error setting up Dwelo config: %s", e)
                 errors["base"] = "unknown"
 
         return self.async_show_form(

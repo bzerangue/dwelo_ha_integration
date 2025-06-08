@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_EMAIL, Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_GATEWAY_ID, DOMAIN, HOST
+from .const import DOMAIN, HOST
 from .dwelo_client import DweloClient
 from .models import DweloData
 
@@ -19,7 +19,7 @@ PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.LOCK]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Dwelo Integration from a config entry."""
-    _LOGGER.debug("Setting up Dwelo config entry: %s with gateway_id: %s", entry.entry_id, entry.data[CONF_GATEWAY_ID])
+    _LOGGER.debug("Setting up Dwelo config entry: %s", entry.entry_id)
     hass.data.setdefault(DOMAIN, {})
 
     client = DweloClient(
@@ -27,7 +27,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         entry.data[CONF_EMAIL],
         entry.data[CONF_PASSWORD],
-        entry.data[CONF_GATEWAY_ID],
     )
 
     if not await client.login():

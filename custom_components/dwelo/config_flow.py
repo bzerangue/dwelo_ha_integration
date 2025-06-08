@@ -7,7 +7,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback, HomeAssistant
 
-from .const import CONF_GATEWAY_ID, DOMAIN, HOST
+from .const import DOMAIN, HOST
 from .dwelo_client import DweloClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ class DweloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self.hass,
                     user_input[CONF_EMAIL],
                     user_input[CONF_PASSWORD],
-                    user_input[CONF_GATEWAY_ID],
                 )
                 if not await client.login():
                     errors["base"] = "invalid_auth"
@@ -40,9 +39,7 @@ class DweloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     if not devices:
                         errors["base"] = "no_devices"
                     else:
-                        await self.async_set_unique_id(
-                            f"{user_input[CONF_EMAIL]}_{user_input[CONF_GATEWAY_ID]}"
-                        )
+                        await self.async_set_unique_id(user_input[CONF_EMAIL])
                         self._abort_if_unique_id_configured()
                         return self.async_create_entry(
                             title=f"Dwelo ({user_input[CONF_EMAIL]})",
@@ -58,7 +55,6 @@ class DweloConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_EMAIL): str,
                     vol.Required(CONF_PASSWORD): str,
-                    vol.Required(CONF_GATEWAY_ID): str,
                 }
             ),
             errors=errors,
@@ -76,7 +72,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry):
         """Initialize options flow."""
-        self._config_entry = config_entry  # Changed from self.config_entry
+        self._config_entry = config_entry
         _LOGGER.debug("Initializing Dwelo options flow for entry: %s", config_entry.entry_id)
 
     async def async_step_init(self, user_input=None):
@@ -91,7 +87,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     self.hass,
                     user_input[CONF_EMAIL],
                     user_input[CONF_PASSWORD],
-                    user_input[CONF_GATEWAY_ID],
                 )
                 if not await client.login():
                     errors["base"] = "invalid_auth"
@@ -116,10 +111,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Required(
                         CONF_PASSWORD,
                         default=self._config_entry.data.get(CONF_PASSWORD),
-                    ): str,
-                    vol.Required(
-                        CONF_GATEWAY_ID,
-                        default=self._config_entry.data.get(CONF_GATEWAY_ID),
                     ): str,
                 }
             ),

@@ -33,17 +33,15 @@ class DweloClient:
         hass: HomeAssistant,
         email: str,
         password: str,
-        gateway_id: str,
     ) -> None:
         """Create a Dwelo client."""
         self._host = host if host.endswith("/") else host + "/"
         self._email = email
         self._password = password
-        self._gateway_id = gateway_id
         self._session: ClientSession = async_create_clientsession(hass)
         self._registered_gateways = set()
         self._bearer_token = None
-        _LOGGER.debug("DweloClient initialized with gateway_id: %s", gateway_id)
+        _LOGGER.debug("DweloClient initialized")
 
     async def login(self) -> bool:
         """Login to the Dwelo API."""
@@ -151,16 +149,11 @@ class DweloClient:
 
     async def get_devices(self) -> dict[str, DweloDeviceMetadata]:
         """Get all devices from the Dwelo API."""
-        _LOGGER.debug("Fetching devices, initial attempt without gatewayId")
+        _LOGGER.debug("Fetching devices without gatewayId")
         device_details = await self.get(f"{self.DEVICE_ENDPOINT}?limit=5000&offset=0")
         if not device_details or "results" not in device_details:
-            _LOGGER.warning("No devices found without gatewayId: %s, trying with configured gateway_id: %s", device_details, self._gateway_id)
-            device_details = await self.get(
-                f"{self.DEVICE_ENDPOINT}?gatewayId={self._gateway_id}&limit=5000&offset=0"
-            )
-            if not device_details or "results" not in device_details:
-                _LOGGER.error("Failed to fetch devices with gateway_id %s: %s", self._gateway_id, device_details)
-                return {}
+            _LOGGER.error("Failed to fetch devices: %s", device_details)
+            return {}
 
         _LOGGER.debug("Device list response: %s", device_details)
         grouped_devices = {}

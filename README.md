@@ -1,4 +1,4 @@
-# Dwelo Custom Integration for Home Assitant
+# Dwelo Custom Integration for Home Assistant
 
 This repo provides an integration to the [Dwelo](https://dwelo.com/) API for [Home Assistant](https://www.home-assistant.io/).
 
